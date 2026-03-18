@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import time
+import base64
 from dotenv import load_dotenv
 
 # Carrega as configurações do .env
@@ -19,7 +20,7 @@ def limpar_tela():
 
 def imprimir_banner():
     print("="*50)
-    print("      AURA PRINTER API - CLIENTE DE TESTE      ")
+    print("      PRINTER API GATEWAY - CLIENTE DE TESTE   ")
     print("="*50)
     print(f"Endpoint: {API_URL}")
     print("="*50 + "\n")
@@ -52,6 +53,7 @@ def enviar_impressao(tipo, conteudo, formatacao=None):
             res = response.json()
             print(f"🚀 Sucesso! Job ID: {res['job_id']}")
             print(f"📍 Destino: {res['impressora']}")
+            print(f"📡 Status: {res['status']}")
         else:
             print(f"💥 Erro na API: {response.text}")
     except Exception as e:
@@ -66,7 +68,7 @@ def menu():
         print("1. [Texto] Impressão Comum (Simples)")
         print("2. [Texto] Impressão Comum (Negrito + Grande)")
         print("3. [Zebra] Etiqueta ZPL (ZPL RAW)")
-        print("4. [PDF]   Imprimir Arquivo PDF (Caminho Local)")
+        print("4. [PDF]   Imprimir Arquivo PDF (Converter para Base64)")
         print("5. [List]  Listar Impressoras Disponíveis")
         print("0. Sair")
         
@@ -82,13 +84,18 @@ def menu():
             enviar_impressao("comum", texto, formatacao=fmt)
         
         elif opcao == "3":
-            zpl = "^XA^FO50,50^A0N,50,50^FDETIQUETA DE TESTE AURA^FS^XZ"
+            zpl = "^XA^FO50,50^A0N,50,50^FDETIQUETA DE TESTE GATEWAY^FS^XZ"
             print(f"Enviando ZPL Padrão: {zpl}")
             enviar_impressao("zebra", zpl)
         
         elif opcao == "4":
             caminho = input("Digite o caminho completo do PDF (Ex: C:\\temp\\teste.pdf): ")
-            enviar_impressao("pdf", caminho)
+            if os.path.exists(caminho):
+                with open(caminho, "rb") as pdf_file:
+                    base64_pdf = base64.b64encode(pdf_file.read()).decode('utf-8')
+                enviar_impressao("pdf", base64_pdf)
+            else:
+                print(f"❌ Arquivo não encontrado: {caminho}")
         
         elif opcao == "5":
             testar_conexao()

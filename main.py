@@ -2,6 +2,9 @@ import os
 import logging
 import uuid
 import sys
+import time
+import base64
+import tempfile
 from logging.handlers import RotatingFileHandler
 import win32print
 import win32ui
@@ -18,27 +21,22 @@ from dotenv import load_dotenv
 # 1. Configuração e Logging (UTF-8 Hardened)
 load_dotenv()
 
-# Configuração robusta para logs em Windows
 log_file = "printer_api.log"
 logger = logging.getLogger("PrinterAPI")
 logger.setLevel(logging.INFO)
 
-# Remove handlers existentes para evitar duplicidade e conflitos de encoding
 if logger.hasHandlers():
     logger.handlers.clear()
 
-# Handler para Arquivo (UTF-8)
 file_handler = RotatingFileHandler(log_file, maxBytes=1000000, backupCount=5, encoding='utf-8')
 file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
-# Handler para Console (UTF-8)
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(file_formatter)
 logger.addHandler(console_handler)
 
-# Evitar propagação para o logger raiz que pode estar mal configurado
 logger.propagate = False
 
 IMPRESSORA_PADRAO = os.getenv("IMPRESSORA_PADRAO", "Microsoft Print to PDF")
@@ -60,8 +58,8 @@ class Formatacao(BaseModel):
     alinhamento: str = "left"
 
 class ImpressaoRequest(BaseModel):
-    tipo: str
-    conteudo: str
+    tipo: str # "comum", "zebra", "pdf"
+    conteudo: str # Texto, ZPL ou Base64 do PDF
     impressora: Optional[str] = None
     formatacao: Optional[Formatacao] = Formatacao()
 
@@ -80,7 +78,6 @@ def get_printer_status(status_code):
 def get_system_data():
     impressoras_data = []
     try:
-        # PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS para pegar tudo
         impressoras = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
         for imp in impressoras:
             try:
@@ -101,7 +98,6 @@ def get_system_data():
     logs = []
     if os.path.exists(log_file):
         try:
-            # Lendo com UTF-8 e substituindo caracteres que falharem
             with open(log_file, "r", encoding='utf-8', errors='replace') as f:
                 logs = [line.strip() for line in f.readlines()[-25:]]
         except Exception as e:
@@ -109,12 +105,11 @@ def get_system_data():
     
     return {"impressoras": impressoras_data, "logs": logs}
 
-# Endpoints de Impressão
+# Funções de Execução de Impressão
 def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
     try:
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(nome_impressora)
-        # Título do documento sem caracteres especiais para evitar conflitos no spooler antigo
         hdc.StartDoc("Printer_API_Job")
         hdc.StartPage()
         weight = 700 if formatacao.negrito else 400
@@ -125,7 +120,7 @@ def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
             hdc.TextOut(100, y, linha)
             y += int(formatacao.tamanho * 1.5)
         hdc.EndPage(); hdc.EndDoc(); hdc.DeleteDC()
-        logger.info(f"Sucesso: Impressao enviada para '{nome_impressora}'")
+        logger.info(f"Sucesso: Impressao comum enviada para '{nome_impressora}'")
     except Exception as e: 
         logger.error(f"Falha na impressao comum: {e}")
 
@@ -139,6 +134,19 @@ def executar_impressao_zebra(nome_impressora, zpl_code):
         logger.info(f"Sucesso: ZPL enviado para '{nome_impressora}'")
     except Exception as e: 
         logger.error(f"Falha na impressao Zebra: {e}")
+
+def executar_impressao_pdf(nome_impressora, caminho_pdf):
+    try:
+        # "printto" é o comando padrão para imprimir em uma impressora específica no Windows
+        win32api.ShellExecute(0, "printto", caminho_pdf, f'"{nome_impressora}"', ".", 0)
+        logger.info(f"Sucesso: PDF enviado para o spooler da '{nome_impressora}'")
+        # Aguarda um tempo seguro para o spooler carregar o arquivo antes de deletar
+        time.sleep(10)
+        if os.path.exists(caminho_pdf):
+            os.remove(caminho_pdf)
+            logger.info(f"Arquivo temporário removido: {caminho_pdf}")
+    except Exception as e:
+        logger.error(f"Falha na impressao PDF: {e}")
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request):
@@ -163,12 +171,25 @@ async def listar_impressoras():
 async def imprimir(pedido: ImpressaoRequest, background_tasks: BackgroundTasks):
     nome_impressora = pedido.impressora if pedido.impressora else IMPRESSORA_PADRAO
     job_id = str(uuid.uuid4())[:8]
+    
     if pedido.tipo == "zebra":
         background_tasks.add_task(executar_impressao_zebra, nome_impressora, pedido.conteudo)
+    elif pedido.tipo == "pdf":
+        try:
+            # Decodifica Base64 e salva em arquivo temporário
+            pdf_bytes = base64.b64decode(pedido.conteudo)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(pdf_bytes)
+                caminho_temp = tmp.name
+            background_tasks.add_task(executar_impressao_pdf, nome_impressora, caminho_temp)
+            logger.info(f"Processando PDF em Background. Temp: {caminho_temp}")
+        except Exception as e:
+            logger.error(f"Erro ao processar Base64 de PDF: {e}")
+            raise HTTPException(status_code=400, detail="Conteúdo do PDF inválido (Base64 esperado).")
     else:
         background_tasks.add_task(executar_impressao_comum, nome_impressora, pedido.conteudo, pedido.formatacao)
-    return {"job_id": job_id, "status": "Enviado para fila", "impressora": nome_impressora}
+    
+    return {"job_id": job_id, "status": "Processando em segundo plano", "impressora": nome_impressora}
 
 if __name__ == "__main__":
-    # Garante que o uvicorn também saiba que estamos em UTF-8
     uvicorn.run(app, host="0.0.0.0", port=PORTA_API)
