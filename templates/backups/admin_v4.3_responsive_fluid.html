@@ -159,7 +159,7 @@
                                     <div class="text-stone-500 group-hover:text-white transition-colors">
                                         <iconify-icon icon="solar:printer-bold" class="text-xl"></iconify-icon>
                                     </div>
-                                    <span class="status-badge ${imp.status === 'Pronta' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5' : 'text-amber-400 border-amber-400/20 bg-amber-400/5'}">
+                                    <span class="status-badge {% if imp.status == 'Pronta' %}text-emerald-400 border-emerald-400/20 bg-emerald-400/5{% else %}text-amber-400 border-amber-400/20 bg-amber-400/5{% endif %}">
                                         {{ imp.status }}
                                     </span>
                                 </div>

@@ -1,6 +1,7 @@
 import os
 import logging
 import uuid
+import sys
 from logging.handlers import RotatingFileHandler
 import win32print
 import win32ui
@@ -14,22 +15,37 @@ from typing import Optional, List
 import uvicorn
 from dotenv import load_dotenv
 
-# 1. Configuração e Logging
+# 1. Configuração e Logging (UTF-8 Hardened)
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("PrinterAPI")
 
-# Garantindo que o log seja escrito em UTF-8
-handler = RotatingFileHandler("printer_api.log", maxBytes=1000000, backupCount=5, encoding='utf-8')
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+# Configuração robusta para logs em Windows
+log_file = "printer_api.log"
+logger = logging.getLogger("PrinterAPI")
+logger.setLevel(logging.INFO)
+
+# Remove handlers existentes para evitar duplicidade e conflitos de encoding
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+# Handler para Arquivo (UTF-8)
+file_handler = RotatingFileHandler(log_file, maxBytes=1000000, backupCount=5, encoding='utf-8')
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Handler para Console (UTF-8)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(file_formatter)
+logger.addHandler(console_handler)
+
+# Evitar propagação para o logger raiz que pode estar mal configurado
+logger.propagate = False
 
 IMPRESSORA_PADRAO = os.getenv("IMPRESSORA_PADRAO", "Microsoft Print to PDF")
 PORTA_API = int(os.getenv("PORTA_API", 5000))
 API_KEY = os.getenv("API_KEY", "minha_chave_segura_123")
 
-app = FastAPI(title="Printer API - Aura Edition")
+app = FastAPI(title="Printer API - Gateway Edition")
 templates = Jinja2Templates(directory="templates")
 
 # 2. Segurança (API Key)
@@ -64,25 +80,32 @@ def get_printer_status(status_code):
 def get_system_data():
     impressoras_data = []
     try:
+        # PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS para pegar tudo
         impressoras = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
         for imp in impressoras:
-            hPrinter = win32print.OpenPrinter(imp[2])
-            info = win32print.GetPrinter(hPrinter, 2)
-            impressoras_data.append({
-                "nome": imp[2],
-                "status": get_printer_status(info['Status']),
-                "trabalhos_na_fila": info['cJobs'],
-                "driver": info['pDriverName']
-            })
-            win32print.ClosePrinter(hPrinter)
+            try:
+                hPrinter = win32print.OpenPrinter(imp[2])
+                info = win32print.GetPrinter(hPrinter, 2)
+                impressoras_data.append({
+                    "nome": str(imp[2]),
+                    "status": get_printer_status(info['Status']),
+                    "trabalhos_na_fila": info['cJobs'],
+                    "driver": str(info['pDriverName'])
+                })
+                win32print.ClosePrinter(hPrinter)
+            except Exception as e_inner:
+                logger.error(f"Erro ao abrir impressora {imp[2]}: {e_inner}")
     except Exception as e:
-        logger.error(f"Erro ao obter dados: {e}")
+        logger.error(f"Erro ao listar impressoras: {e}")
 
     logs = []
-    if os.path.exists("printer_api.log"):
-        # Lendo explicitamente em UTF-8 para evitar caracteres estranhos
-        with open("printer_api.log", "r", encoding='utf-8', errors='replace') as f:
-            logs = [line.strip() for line in f.readlines()[-20:]]
+    if os.path.exists(log_file):
+        try:
+            # Lendo com UTF-8 e substituindo caracteres que falharem
+            with open(log_file, "r", encoding='utf-8', errors='replace') as f:
+                logs = [line.strip() for line in f.readlines()[-25:]]
+        except Exception as e:
+            logger.error(f"Erro ao ler log: {e}")
     
     return {"impressoras": impressoras_data, "logs": logs}
 
@@ -91,7 +114,8 @@ def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
     try:
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(nome_impressora)
-        hdc.StartDoc("Impressão API")
+        # Título do documento sem caracteres especiais para evitar conflitos no spooler antigo
+        hdc.StartDoc("Printer_API_Job")
         hdc.StartPage()
         weight = 700 if formatacao.negrito else 400
         font = win32ui.CreateFont({"name": "Arial", "height": formatacao.tamanho, "weight": weight})
@@ -101,18 +125,20 @@ def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
             hdc.TextOut(100, y, linha)
             y += int(formatacao.tamanho * 1.5)
         hdc.EndPage(); hdc.EndDoc(); hdc.DeleteDC()
-        logger.info(f"Sucesso: Impressão comum enviada para '{nome_impressora}'")
-    except Exception as e: logger.error(f"Falha na impressão comum: {e}")
+        logger.info(f"Sucesso: Impressao enviada para '{nome_impressora}'")
+    except Exception as e: 
+        logger.error(f"Falha na impressao comum: {e}")
 
 def executar_impressao_zebra(nome_impressora, zpl_code):
     try:
         hPrinter = win32print.OpenPrinter(nome_impressora)
-        win32print.StartDocPrinter(hPrinter, 1, ("Etiqueta API", None, "RAW"))
+        win32print.StartDocPrinter(hPrinter, 1, ("Etiqueta_ZPL", None, "RAW"))
         win32print.StartPagePrinter(hPrinter)
         win32print.WritePrinter(hPrinter, zpl_code.encode("utf-8"))
         win32print.EndPagePrinter(hPrinter); win32print.EndDocPrinter(hPrinter); win32print.ClosePrinter(hPrinter)
         logger.info(f"Sucesso: ZPL enviado para '{nome_impressora}'")
-    except Exception as e: logger.error(f"Falha na impressão Zebra: {e}")
+    except Exception as e: 
+        logger.error(f"Falha na impressao Zebra: {e}")
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request):
@@ -144,4 +170,5 @@ async def imprimir(pedido: ImpressaoRequest, background_tasks: BackgroundTasks):
     return {"job_id": job_id, "status": "Enviado para fila", "impressora": nome_impressora}
 
 if __name__ == "__main__":
+    # Garante que o uvicorn também saiba que estamos em UTF-8
     uvicorn.run(app, host="0.0.0.0", port=PORTA_API)

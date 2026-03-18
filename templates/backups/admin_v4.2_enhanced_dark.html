@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Printer API Gateway | Responsive Console</title>
+    <title>Printer API Gateway | Enhanced Console</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,9 +41,9 @@
             font-family: 'Inter', sans-serif;
             background-color: #0C0A09;
             color: #FAFAF9;
-            min-height: 100vh;
+            overflow: hidden;
             -webkit-font-smoothing: antialiased;
-            overflow-y: auto; /* Habilita scroll vertical se necessário */
+            height: 100vh;
         }
 
         /* Mouse Following Light Effect */
@@ -88,12 +88,6 @@
         .status-badge {
             font-size: 8px; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;
         }
-        
-        /* Desktop Fixed Layout but Scrollable Content */
-        @media (min-width: 1024px) {
-            .app-container { height: 100vh; overflow: hidden; }
-            .scrollable-main { height: calc(100vh - 3.5rem); overflow-y: auto; }
-        }
     </style>
 </head>
 
@@ -101,8 +95,7 @@
     <div class="noise"></div>
     <div class="mouse-glow" id="glow"></div>
 
-    <!-- MAIN CONSOLE WRAPPER -->
-    <div class="app-container flex-grow flex flex-col max-w-[1800px] mx-auto w-full border-x border-white/5 bg-[#0C0A09]/80 relative z-10 shadow-2xl shadow-black">
+    <div class="flex-grow flex flex-col max-w-[1800px] mx-auto w-full border-x border-white/5 bg-[#0C0A09]/80 relative z-10 overflow-hidden shadow-2xl shadow-black">
         
         <!-- HEADER -->
         <header class="h-14 border-b border-white/10 bg-stone-900/60 backdrop-blur-xl flex items-center justify-between px-6 shrink-0 relative z-50">
@@ -112,7 +105,7 @@
                 </div>
                 <div class="flex flex-col">
                     <span class="font-display font-bold text-sm tracking-tight leading-none text-white uppercase">Printer API <span class="text-stone-400 font-medium tracking-normal lowercase">gateway</span></span>
-                    <span class="text-[8px] font-mono text-stone-500 uppercase tracking-[0.3em]">Management Console v4.3</span>
+                    <span class="text-[8px] font-mono text-stone-500 uppercase tracking-[0.3em]">Management Console v4.2</span>
                 </div>
             </div>
 
@@ -133,22 +126,23 @@
             </div>
         </header>
 
-        <!-- DASHBOARD GRID -->
-        <div class="scrollable-main flex-grow flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+        <!-- MAIN DASHBOARD -->
+        <div class="flex-grow flex flex-col lg:flex-row overflow-hidden">
             
-            <!-- PRIMARY COLUMN -->
-            <main class="flex-grow flex flex-col border-r border-white/10 min-h-0">
+            <main class="flex-grow flex flex-col border-r border-white/10 overflow-hidden">
                 
-                <!-- PRINTERS (Scrollable if needed) -->
+                <!-- PRINTER GRID (COMPACT & HIGH CONTRAST) -->
                 <section class="p-4 lg:p-6 shrink-0 border-b border-white/5 bg-stone-900/10">
                     <div class="flex items-center justify-between mb-5">
                         <div class="flex items-center gap-3">
                             <iconify-icon icon="solar:widget-5-bold-duotone" class="text-stone-600 text-xl"></iconify-icon>
                             <h2 class="text-[10px] font-mono uppercase tracking-[0.3em] text-stone-300 font-bold">01 / Hardware Monitor</h2>
                         </div>
-                        <span class="text-[9px] font-mono text-stone-100 bg-white/5 px-2 py-1 rounded border border-white/10">
-                            ACTIVE NODES: {{ impressoras|length }}
-                        </span>
+                        <div class="flex gap-2">
+                            <span class="text-[9px] font-mono text-stone-100 bg-white/5 px-2 py-1 rounded border border-white/10">
+                                ACTIVE NODES: {{ impressoras|length }}
+                            </span>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3" id="printersGrid">
@@ -159,7 +153,7 @@
                                     <div class="text-stone-500 group-hover:text-white transition-colors">
                                         <iconify-icon icon="solar:printer-bold" class="text-xl"></iconify-icon>
                                     </div>
-                                    <span class="status-badge ${imp.status === 'Pronta' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5' : 'text-amber-400 border-amber-400/20 bg-amber-400/5'}">
+                                    <span class="status-badge {% if imp.status == 'Pronta' %}text-emerald-400 border-emerald-400/20 bg-emerald-400/5{% else %}text-amber-400 border-amber-400/20 bg-amber-400/5{% endif %}">
                                         {{ imp.status }}
                                     </span>
                                 </div>
@@ -178,11 +172,11 @@
                     </div>
                 </section>
 
-                <!-- LOGS (Always Scrollable) -->
-                <section class="flex-grow flex flex-col overflow-hidden bg-black/40 min-h-[300px]">
+                <!-- LIVE TERMINAL (ULTRA DARK) -->
+                <section class="flex-grow flex flex-col overflow-hidden bg-black/40">
                     <div class="h-9 border-b border-white/5 flex items-center justify-between px-6 bg-black/60">
                         <div class="flex items-center gap-3">
-                            <span class="text-[10px] font-mono uppercase tracking-[0.3em] text-stone-400 font-bold">02 / Live Execution Stream</span>
+                            <span class="text-[9px] font-mono uppercase tracking-[0.3em] text-stone-400 font-bold">02 / Live Execution Stream</span>
                         </div>
                         <div class="flex items-center gap-2 text-[9px] font-mono text-stone-600">
                             <span class="animate-pulse">●</span> LIVE
@@ -199,10 +193,10 @@
                 </section>
             </main>
 
-            <!-- SIDE PANEL -->
-            <aside class="w-full lg:w-80 shrink-0 p-6 flex flex-col gap-5 bg-stone-950/50 backdrop-blur-2xl border-l border-white/10 relative z-20 overflow-y-auto">
+            <!-- RIGHT CONTROL PANEL -->
+            <aside class="w-full lg:w-80 shrink-0 p-6 flex flex-col gap-5 bg-stone-950/50 backdrop-blur-2xl border-l border-white/10 relative z-20">
                 
-                <!-- SECURITY -->
+                <!-- CREDENTIALS -->
                 <div class="flashlight-card p-6 rounded-lg border-white/10">
                     <span class="text-[9px] font-mono uppercase tracking-[0.3em] text-stone-500 mb-4 block">03 / Security</span>
                     <h3 class="text-lg font-display font-medium text-white mb-6">Authorization</h3>
@@ -223,8 +217,8 @@
                     </div>
                 </div>
 
-                <!-- INTEGRATION -->
-                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-lg group hover:bg-white/[0.04] transition-all">
+                <!-- INTEGRATION HELPER -->
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-lg flex-grow flex flex-col group hover:bg-white/[0.04] transition-all">
                     <div class="flex items-center gap-3 mb-6">
                         <div class="w-6 h-6 rounded-full bg-stone-100/10 flex items-center justify-center text-stone-400">
                             <iconify-icon icon="solar:code-square-bold"></iconify-icon>
@@ -245,7 +239,7 @@
                         </p>
                     </div>
 
-                    <div class="mt-6 pt-6 border-t border-white/5 flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <div class="mt-auto pt-6 border-t border-white/5 flex items-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
                         <div class="w-8 h-8 bg-emerald-500/20 border border-emerald-500/20 flex items-center justify-center rounded">
                             <iconify-icon icon="solar:shield-check-bold" class="text-lg text-emerald-400"></iconify-icon>
                         </div>
@@ -262,6 +256,7 @@
 
     <script>
         // Mouse Glow Effect
+        const glow = document.getElementById('glow');
         function handleMouseMove(e) {
             document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
             document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
