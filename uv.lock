@@ -474,6 +474,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "jinja2" },
     { name = "python-dotenv" },
     { name = "pywin32" },
     { name = "requests" },
@@ -482,6 +483,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.1" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pywin32", specifier = ">=311" },
     { name = "requests", specifier = ">=2.32.5" },

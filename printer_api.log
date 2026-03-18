@@ -1,3 +1,20 @@
 2026-03-18 11:49:35,640 - PrinterAPI - INFO - Iniciando Printer API na porta 5000...
 2026-03-18 11:57:44,593 - PrinterAPI - INFO - Iniciando Printer API na porta 5000...
 2026-03-18 12:02:46,723 - PrinterAPI - INFO - Iniciando Printer API na porta 5000...
+2026-03-18 13:21:01,774 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:21:06,499 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:21:12,562 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:21:16,247 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:21:17,444 - PrinterAPI - ERROR - Falha na impressï¿½o comum: StartDoc failed
+2026-03-18 13:23:31,499 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:32,133 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:35,141 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:35,933 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:38,106 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:39,745 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:41,438 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:43,779 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:45,728 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:23:48,429 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:37:54,559 - PrinterAPI - INFO - Sucesso: Impressï¿½o comum enviada para 'Microsoft Print to PDF'
+2026-03-18 13:54:35,062 - PrinterAPI - INFO - Sucesso: Impressão comum enviada para 'Microsoft Print to PDF'
