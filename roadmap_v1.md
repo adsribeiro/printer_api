@@ -4,11 +4,11 @@ Este documento estabelece as fases de melhoria para transformar o protótipo atu
 
 ---
 
-## 🚀 Fase 1: Estabilização e Configuração (Curto Prazo)
-- [ ] **Configuração Dinâmica**: Mover o nome da impressora (`IMPRESSORA_PDF`) para variáveis de ambiente (`.env`) ou um arquivo `config.yaml`.
-- [ ] **Tratamento de Erros Refinado**: Criar exceções personalizadas para casos como "Impressora Offline", "Papel Acabou" ou "Driver não Encontrado".
-- [ ] **Logging Profissional**: Implementar a biblioteca `logging` para registrar cada tentativa de impressão, sucessos e falhas em arquivos de log rotativos.
-- [ ] **Listagem de Impressoras**: Criar um endpoint `GET /impressoras` que retorne a lista de impressoras instaladas no Windows para facilitar a configuração.
+## 🚀 Fase 1: Estabilização e Configuração (Concluída ✅)
+- [x] **Configuração Dinâmica**: Mover o nome da impressora (`IMPRESSORA_PDF`) para variáveis de ambiente (`.env`) ou um arquivo `config.yaml`.
+- [x] **Tratamento de Erros Refinado**: Criar exceções personalizadas para casos como "Impressora Offline", "Papel Acabou" ou "Driver não Encontrado".
+- [x] **Logging Profissional**: Implementar a biblioteca `logging` para registrar cada tentativa de impressão, sucessos e falhas em arquivos de log rotativos.
+- [x] **Listagem de Impressoras**: Criar um endpoint `GET /impressoras` que retorne a lista de impressoras instaladas no Windows para facilitar a configuração.
 
 ## 🛠️ Fase 2: Funcionalidades Avançadas (Médio Prazo)
 - [ ] **Suporte a Múltiplas Impressoras**: Permitir que o JSON da requisição especifique qual impressora usar (ex: `{"impressora": "Zebra_Cozinha", ...}`).
