@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html class="scroll-smooth" lang="pt-br">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Aura Printer API | Dark Monitor</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        stone: {
+                            50: '#fafaf9', 100: '#f5f5f4', 200: '#e7e5e4', 300: '#d6d3d1',
+                            400: '#a8a29e', 500: '#78716c', 600: '#57534e', 700: '#44403c',
+                            800: '#292524', 900: '#1c1917',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1C1917; /* Stone 900 */
+            color: #FAFAF9;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Desktop Fix */
+        @media (min-width: 1024px) {
+            body, .main-wrapper { height: 100vh; overflow: hidden; }
+        }
+
+        .noise {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0.05; pointer-events: none; z-index: 9999;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .bg-grid {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        }
+
+        .flashlight-card {
+            background: rgba(41, 37, 36, 0.8); /* Stone 800 */
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .flashlight-card::before {
+            content: ""; position: absolute; inset: 0px;
+            background: radial-gradient(400px circle at var(--mouse-x, 0) var(--mouse-y, 0), 
+                        rgba(255, 255, 255, 0.08), 
+                        transparent 40%);
+            opacity: 0; transition: opacity 0.5s; pointer-events: none; z-index: 2;
+        }
+
+        .flashlight-card:hover::before { opacity: 1; }
+        .flashlight-card:hover { border-color: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
+
+        .log-terminal {
+            scrollbar-width: thin;
+            scrollbar-color: #44403c transparent;
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #44403c; border-radius: 10px; }
+
+        .status-badge {
+            font-size: 9px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.1em;
+            font-weight: 600; border: 1px solid currentColor;
+        }
+    </style>
+</head>
+
+<body class="antialiased bg-grid">
+    <div class="noise"></div>
+
+    <!-- Vertical Accent Lines -->
+    <div class="fixed inset-0 pointer-events-none grid grid-cols-12 gap-0 z-0 opacity-10">
+        <div class="border-r border-white h-full"></div><div class="border-r border-white h-full"></div>
+        <div class="border-r border-white h-full"></div><div class="border-r border-white h-full"></div>
+        <div class="border-r border-white h-full"></div><div class="border-r border-white h-full"></div>
+        <div class="border-r border-white h-full"></div><div class="border-r border-white h-full"></div>
+        <div class="border-r border-white h-full"></div><div class="border-r border-white h-full"></div>
+        <div class="border-r border-white h-full"></div>
+    </div>
+
+    <div class="main-wrapper max-w-[1600px] mx-auto border-x border-white/5 bg-[#1C1917]/95 relative z-10 flex flex-col">
+        
+        <!-- HEADER -->
+        <header class="h-16 border-b border-white/5 bg-stone-900/50 backdrop-blur-xl flex items-center justify-between px-8 shrink-0">
+            <div class="flex items-center gap-4">
+                <div class="w-9 h-9 bg-white text-stone-900 flex items-center justify-center rounded-sm shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                    <iconify-icon icon="solar:printer-bold-duotone" class="text-xl"></iconify-icon>
+                </div>
+                <div>
+                    <span class="font-display font-medium tracking-tight text-lg block leading-none">AURA<span class="text-stone-500">.DARK</span></span>
+                    <span class="text-[9px] font-mono text-stone-600 uppercase tracking-widest">Printer Management v4.0</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-8">
+                <div class="hidden md:flex flex-col items-end">
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-500" id="syncStatus">Synchronized</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-stone-500">Auto-refresh in <span id="timer" class="text-white">3</span>s</span>
+                </div>
+                <button onclick="updateDashboard()" class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-all group">
+                    <iconify-icon icon="solar:restart-linear" class="text-stone-400 group-hover:text-white group-hover:rotate-180 transition-all duration-700"></iconify-icon>
+                </button>
+            </div>
+        </header>
+
+        <!-- CONTENT GRID -->
+        <div class="flex-grow flex flex-col lg:flex-row overflow-hidden">
+            
+            <!-- LEFT PANEL: Devices & Terminal -->
+            <main class="flex-grow flex flex-col border-r border-white/5 overflow-hidden">
+                
+                <!-- DEVICE MONITOR -->
+                <section class="p-6 lg:p-8 shrink-0">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <span class="text-[10px] font-mono uppercase tracking-[0.3em] text-stone-600 block mb-1">01 / Hardware Monitor</span>
+                            <h2 class="text-3xl font-display font-medium tracking-tight text-stone-100">Active Devices</h2>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-2xl font-display font-bold text-white">{{ impressoras|length }}</span>
+                            <span class="text-[8px] font-mono text-stone-600 uppercase tracking-tighter">Total Printers</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="printersGrid">
+                        {% for imp in impressoras %}
+                        <div class="flashlight-card p-5 rounded-lg group" onmousemove="updateFlashlight(event, this)">
+                            <div class="relative z-10">
+                                <div class="flex justify-between items-start mb-6">
+                                    <div class="w-10 h-10 rounded-sm bg-white/5 border border-white/10 flex items-center justify-center text-stone-500 group-hover:text-white group-hover:bg-white/10 transition-all">
+                                        <iconify-icon icon="solar:printer-minimalistic-bold-duotone" class="text-xl"></iconify-icon>
+                                    </div>
+                                    <span class="status-badge {% if imp.status == 'Pronta' %}text-emerald-500 bg-emerald-500/5{% else %}text-amber-500 bg-amber-500/5{% endif %}">
+                                        {{ imp.status }}
+                                    </span>
+                                </div>
+                                <h3 class="text-base font-display font-semibold text-white mb-1 truncate">{{ imp.nome }}</h3>
+                                <p class="text-[10px] font-mono text-stone-500 truncate mb-6">{{ imp.driver }}</p>
+                                
+                                <div class="pt-4 border-t border-white/5 flex justify-between items-end">
+                                    <span class="text-[9px] font-mono uppercase text-stone-600">Buffer Queue</span>
+                                    <div class="flex items-baseline gap-1">
+                                        <span class="text-xl font-display font-bold {% if imp.trabalhos_na_fila > 0 %}text-emerald-400{% else %}text-stone-700{% endif %}">{{ imp.trabalhos_na_fila }}</span>
+                                        <span class="text-[9px] font-mono text-stone-600">JOBS</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <!-- LIVE TERMINAL (Darkest Area) -->
+                <section class="flex-grow flex flex-col bg-black/20 overflow-hidden border-t border-white/5">
+                    <div class="h-10 border-b border-white/5 flex items-center justify-between px-8 bg-black/40">
+                        <div class="flex items-center gap-3">
+                            <div class="flex gap-1.5">
+                                <div class="w-2 h-2 rounded-full bg-stone-800"></div>
+                                <div class="w-2 h-2 rounded-full bg-stone-800"></div>
+                                <div class="w-2 h-2 rounded-full bg-stone-800"></div>
+                            </div>
+                            <span class="text-[10px] font-mono uppercase tracking-[0.2em] text-stone-500">02 / Live Activity Stream</span>
+                        </div>
+                        <iconify-icon icon="solar:code-bold" class="text-stone-700"></iconify-icon>
+                    </div>
+                    <div class="log-terminal flex-grow p-6 overflow-y-auto font-mono text-[11px] leading-relaxed text-stone-400" id="logBox">
+                        {% for log in logs %}
+                        <div class="flex gap-4 mb-1.5 group hover:text-stone-100 transition-colors">
+                            <span class="text-stone-800 select-none shrink-0">$</span>
+                            <span class="opacity-70 group-hover:opacity-100">{{ log }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </main>
+
+            <!-- RIGHT PANEL: Security & Quick Tools -->
+            <aside class="w-full lg:w-96 shrink-0 p-8 flex flex-col gap-6 bg-stone-900/30">
+                
+                <!-- SECURITY CARD -->
+                <div class="flashlight-card p-8 rounded-xl relative group overflow-hidden border-white/10" onmousemove="updateFlashlight(event, this)">
+                    <div class="absolute -bottom-10 -left-10 opacity-5 rotate-12 group-hover:opacity-10 transition-opacity">
+                        <iconify-icon icon="solar:shield-keyhole-bold-duotone" class="text-[14rem] text-white"></iconify-icon>
+                    </div>
+
+                    <span class="text-[10px] font-mono uppercase tracking-[0.3em] text-stone-600 mb-4 block">03 / Security Gateway</span>
+                    <h3 class="text-2xl font-display font-medium text-white mb-8">Access Token</h3>
+                    
+                    <div class="space-y-6 relative z-10">
+                        <div class="group/input">
+                            <label class="block text-[9px] font-mono uppercase text-stone-500 mb-2 tracking-widest group-focus-within/input:text-white transition-colors">Authorization Key</label>
+                            <div class="flex gap-2">
+                                <input type="password" id="apiKey" value="{{ api_key_exemplo }}" readonly class="flex-grow bg-black/40 border border-white/5 p-3.5 text-xs font-mono rounded-sm outline-none text-stone-400 shadow-inner focus:border-white/20 transition-all">
+                                <button onclick="toggleKey()" class="w-12 border border-white/5 bg-white/5 text-stone-400 rounded-sm flex items-center justify-center hover:bg-white/10 hover:text-white transition-all">
+                                    <iconify-icon icon="solar:eye-linear" id="toggleIcon"></iconify-icon>
+                                </button>
+                                <button onclick="copyKey()" class="w-12 bg-white text-stone-900 rounded-sm flex items-center justify-center hover:bg-stone-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                                    <iconify-icon icon="solar:copy-linear" class="text-xl"></iconify-icon>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API INTEGRATION -->
+                <div class="bg-white/5 border border-white/5 p-8 rounded-xl flex-grow flex flex-col relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4">
+                        <iconify-icon icon="solar:link-bold-duotone" class="text-4xl text-white/5 group-hover:text-white/10 transition-colors"></iconify-icon>
+                    </div>
+
+                    <span class="text-[10px] font-mono uppercase tracking-[0.3em] text-stone-600 mb-4 block">04 / Rapid Integration</span>
+                    <h4 class="text-xl font-display font-medium text-white mb-6">REST Endpoint</h4>
+                    
+                    <div class="space-y-6 flex-grow">
+                        <div class="p-5 bg-black/50 rounded-lg border border-white/5 font-mono text-[10px] leading-relaxed text-stone-500">
+                            <span class="text-stone-700">// POST Request</span><br>
+                            <span class="text-emerald-500">fetch</span>('<span class="text-amber-500">/imprimir</span>', {<br>
+                            &nbsp;&nbsp;method: '<span class="text-amber-500">POST</span>',<br>
+                            &nbsp;&nbsp;headers: { '<span class="text-amber-500">X-Api-Key</span>': '...' }<br>
+                            });
+                        </div>
+                        <p class="text-[11px] text-stone-500 font-light leading-relaxed">
+                            A API suporta comandos <strong class="text-stone-300">RAW ZPL</strong> para Zebra e renderização <strong class="text-stone-300">GDI Canvas</strong> para impressoras convencionais.
+                        </p>
+                    </div>
+
+                    <div class="mt-auto pt-8 border-t border-white/5 flex items-center gap-4">
+                        <div class="w-9 h-9 bg-white/5 border border-white/10 flex items-center justify-center rounded-sm">
+                            <iconify-icon icon="solar:square-academic-cap-bold-duotone" class="text-xl text-stone-400"></iconify-icon>
+                        </div>
+                        <div>
+                            <span class="text-xs font-display font-bold text-white tracking-tight uppercase block">System Architecture</span>
+                            <span class="text-[9px] font-mono text-stone-600 uppercase">Operational Status: Peak</span>
+                        </div>
+                    </div>
+                </div>
+
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        function updateFlashlight(e, card) {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            card.style.setProperty('--mouse-x', `${x}px`);
+            card.style.setProperty('--mouse-y', `${y}px`);
+        }
+
+        let timeLeft = 3;
+        const timerElement = document.getElementById('timer');
+        const syncStatus = document.getElementById('syncStatus');
+        const logBox = document.getElementById('logBox');
+        const printersGrid = document.getElementById('printersGrid');
+
+        async function updateDashboard() {
+            if(syncStatus) syncStatus.innerText = "Syncing...";
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                logBox.innerHTML = data.logs.map(log => `
+                    <div class="flex gap-4 mb-1.5 group hover:text-stone-100 transition-colors">
+                        <span class="text-stone-800 select-none shrink-0">$</span>
+                        <span class="opacity-70 group-hover:opacity-100">${log}</span>
+                    </div>
+                `).join('');
+                logBox.scrollTop = logBox.scrollHeight;
+
+                printersGrid.innerHTML = data.impressoras.map(imp => `
+                    <div class="flashlight-card p-5 rounded-lg group" onmousemove="updateFlashlight(event, this)">
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-6">
+                                <div class="w-10 h-10 rounded-sm bg-white/5 border border-white/10 flex items-center justify-center text-stone-500 group-hover:text-white group-hover:bg-white/10 transition-all">
+                                    <iconify-icon icon="solar:printer-minimalistic-bold-duotone" class="text-xl"></iconify-icon>
+                                </div>
+                                <span class="status-badge ${imp.status === 'Pronta' ? 'text-emerald-500 bg-emerald-500/5' : 'text-amber-500 bg-amber-500/5'}">
+                                    ${imp.status}
+                                </span>
+                            </div>
+                            <h3 class="text-base font-display font-semibold text-white mb-1 truncate">${imp.nome}</h3>
+                            <p class="text-[10px] font-mono text-stone-500 truncate mb-6">${imp.driver}</p>
+                            <div class="pt-4 border-t border-white/5 flex justify-between items-end">
+                                <span class="text-[9px] font-mono uppercase text-stone-600">Buffer Queue</span>
+                                <div class="flex items-baseline gap-1">
+                                    <span class="text-xl font-display font-bold ${imp.trabalhos_na_fila > 0 ? 'text-emerald-400' : 'text-stone-700'}">${imp.trabalhos_na_fila}</span>
+                                    <span class="text-[9px] font-mono text-stone-600">JOBS</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                if(syncStatus) syncStatus.innerText = "Synchronized";
+            } catch (error) {
+                if(syncStatus) syncStatus.innerText = "Syncing Error";
+            }
+            timeLeft = 3; 
+        }
+
+        setInterval(() => {
+            timeLeft--;
+            if(timerElement) timerElement.innerText = timeLeft;
+            if (timeLeft <= 0) updateDashboard();
+        }, 1000);
+
+        function copyKey() {
+            const key = document.getElementById("apiKey").value;
+            navigator.clipboard.writeText(key);
+            alert("API Token copied.");
+        }
+
+        function toggleKey() {
+            const input = document.getElementById("apiKey");
+            const icon = document.getElementById("toggleIcon");
+            if (input.type === "password") {
+                input.type = "text";
+                icon.setAttribute("icon", "solar:eye-closed-linear");
+            } else {
+                input.type = "password";
+                icon.setAttribute("icon", "solar:eye-linear");
+            }
+        }
+
+        window.onload = () => { logBox.scrollTop = logBox.scrollHeight; };
+    </script>
+</body>
+</html>
