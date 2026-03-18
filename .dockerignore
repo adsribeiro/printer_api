@@ -1,0 +1,14 @@
+# Dockerization: Windows Containers for Printer API Gateway
+
+.venv/
+__pycache__/
+*.log
+.env
+.git/
+.python-version
+uv.lock
+pyproject.toml
+printer_api.log
+test_comum.json
+testar_api.py
+templates/backups/

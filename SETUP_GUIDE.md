@@ -97,3 +97,24 @@ O painel pode ser acessado em `http://localhost:5000/admin`.
 *   **Encoding**: Todo o sistema é **UTF-8 Hardened**. Logs e mensagens suportam acentuação brasileira completa.
 *   **Fila Assíncrona**: A API utiliza `BackgroundTasks`. O retorno `200 OK` significa que o trabalho foi aceito e está sendo processado pelo spooler do Windows.
 *   **Manutenção de Layout**: Versões anteriores do dashboard são preservadas em `templates/backups/`.
+
+---
+
+## 🐳 7. Dockerização (Windows Containers)
+
+O Gateway pode ser executado em um container para isolamento, mas **exige o uso de Windows Containers** (devido à dependência do `pywin32` e Spooler do Windows).
+
+### Build da Imagem
+```powershell
+docker build -t printer-api-gateway .
+```
+
+### Execução do Container
+```powershell
+docker run -p 5000:5000 --env-file .env --isolation=process printer-api-gateway
+```
+
+### ⚠️ Notas Críticas sobre Docker:
+1.  **Isolamento**: Para que o container acesse as impressoras físicas instaladas no Host, você **deve** utilizar `--isolation=process`. Caso contrário, o container terá um spooler isolado e verá apenas impressoras de rede mapeadas via IP.
+2.  **Base Image**: A imagem utiliza `windowsservercore` (LTSC 2022), que é uma imagem grande (~5GB) necessária para suportar as APIs gráficas (GDI) do Windows.
+
