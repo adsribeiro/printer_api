@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Printer API Gateway | Real-time Console</title>
+    <title>Printer API Gateway | Hardware Monitor</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,6 +89,10 @@
             font-size: 8px; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em;
         }
         
+        .status-ready { color: #34d399; border: 1px solid rgba(52, 211, 153, 0.2); background: rgba(52, 211, 153, 0.05); }
+        .status-warning { color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); background: rgba(251, 191, 36, 0.05); }
+        .status-error { color: #f87171; border: 1px solid rgba(248, 113, 113, 0.2); background: rgba(248, 113, 113, 0.05); }
+
         /* Desktop Fixed Layout but Scrollable Content */
         @media (min-width: 1024px) {
             .app-container { height: 100vh; overflow: hidden; }
@@ -112,7 +116,7 @@
                 </div>
                 <div class="flex flex-col">
                     <span class="font-display font-bold text-sm tracking-tight leading-none text-white uppercase">Printer API <span class="text-stone-400 font-medium tracking-normal lowercase">gateway</span></span>
-                    <span class="text-[8px] font-mono text-stone-500 uppercase tracking-[0.3em]">Management Console v5.0</span>
+                    <span class="text-[8px] font-mono text-stone-500 uppercase tracking-[0.3em]">Hardware Monitor v5.1</span>
                 </div>
             </div>
 
@@ -123,7 +127,7 @@
                             <span id="syncDot" class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.5)]"></span>
                             <span class="text-[9px] font-mono uppercase text-amber-400 font-bold" id="syncStatus">Connecting...</span>
                         </div>
-                        <span class="text-[8px] font-mono text-stone-500 uppercase">Stream: <span id="connType" class="text-white">WebSocket</span></span>
+                        <span class="text-[8px] font-mono text-stone-500 uppercase">Engine: <span id="connType" class="text-white">Enhanced Monitoring</span></span>
                     </div>
                 </div>
                 <button onclick="location.reload()" class="text-stone-400 hover:text-white transition-all flex items-center gap-2 group">
@@ -196,25 +200,18 @@
                     </div>
                 </div>
 
-                <!-- INTEGRATION -->
+                <!-- SYSTEM INFO -->
                 <div class="bg-white/[0.02] border border-white/5 p-6 rounded-lg group hover:bg-white/[0.04] transition-all">
                     <div class="flex items-center gap-3 mb-6">
                         <div class="w-6 h-6 rounded-full bg-stone-100/10 flex items-center justify-center text-stone-400">
-                            <iconify-icon icon="solar:code-square-bold"></iconify-icon>
+                            <iconify-icon icon="solar:info-circle-bold"></iconify-icon>
                         </div>
-                        <span class="text-[10px] font-mono uppercase tracking-[0.2em] text-stone-300 font-bold">Integration</span>
+                        <span class="text-[10px] font-mono uppercase tracking-[0.2em] text-stone-300 font-bold">System Meta</span>
                     </div>
                     
-                    <div class="space-y-5">
-                        <div class="p-4 bg-black/80 rounded border border-white/5 font-mono text-[10px] leading-relaxed text-stone-400 shadow-2xl">
-                            <span class="text-stone-600">// JSON Payload</span><br>
-                            {<br>
-                            &nbsp;&nbsp;"tipo": "<span class="text-amber-400">zebra</span>",<br>
-                            &nbsp;&nbsp;"conteudo": "..."<br>
-                            }
-                        </div>
+                    <div class="space-y-4" id="systemMeta">
                         <p class="text-[10px] text-stone-500 leading-relaxed font-light">
-                            Real-time connection established via WebSockets for zero-latency monitoring.
+                            Select a printer to see detailed metadata. Pre-print validation enabled for critical errors.
                         </p>
                     </div>
 
@@ -223,8 +220,8 @@
                             <iconify-icon icon="solar:shield-check-bold" class="text-lg text-emerald-400"></iconify-icon>
                         </div>
                         <div class="flex flex-col">
-                            <span class="text-[10px] font-bold text-white uppercase leading-none">Gateway Stable</span>
-                            <span class="text-[8px] font-mono text-stone-500 uppercase tracking-tighter">WS: Synchronized</span>
+                            <span class="text-[10px] font-bold text-white uppercase leading-none">Validation Active</span>
+                            <span class="text-[8px] font-mono text-stone-500 uppercase tracking-tighter">Bitmask: Advanced</span>
                         </div>
                     </div>
                 </div>
@@ -234,7 +231,6 @@
     </div>
 
     <script>
-        // Mouse Glow Effect
         function handleMouseMove(e) {
             document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
             document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
@@ -245,6 +241,14 @@
         const logBox = document.getElementById('logBox');
         const printersGrid = document.getElementById('printersGrid');
         const nodesCount = document.getElementById('nodesCount');
+        const systemMeta = document.getElementById('systemMeta');
+
+        function getStatusClass(status) {
+            const s = status.toLowerCase();
+            if (s === 'pronta') return 'status-ready';
+            if (s.includes('erro') || s.includes('offline') || s.includes('sem papel') || s.includes('atolamento') || s.includes('tampa aberta')) return 'status-error';
+            return 'status-warning';
+        }
 
         function connectWS() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -259,7 +263,6 @@
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 
-                // Update Logs
                 logBox.innerHTML = data.logs.map(log => `
                     <div class="flex gap-4 mb-1 group hover:bg-white/5 transition-all px-2 py-0.5 rounded">
                         <span class="text-stone-700 select-none font-bold shrink-0">#</span>
@@ -268,20 +271,20 @@
                 `).join('');
                 logBox.scrollTop = logBox.scrollHeight;
 
-                // Update Nodes Count
                 nodesCount.innerText = `ACTIVE NODES: ${data.impressoras.length}`;
 
-                // Update Printers
                 printersGrid.innerHTML = data.impressoras.map(imp => `
-                    <div class="flashlight-card p-3.5 rounded-sm group transition-all">
+                    <div class="flashlight-card p-3.5 rounded-sm group transition-all cursor-pointer" onclick='showMeta(${JSON.stringify(imp)})'>
                         <div class="relative z-10">
                             <div class="flex justify-between items-start mb-3">
                                 <div class="text-stone-500 group-hover:text-white transition-colors">
                                     <iconify-icon icon="solar:printer-bold" class="text-xl"></iconify-icon>
                                 </div>
-                                <span class="status-badge ${imp.status === 'Pronta' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5' : 'text-amber-400 border-amber-400/20 bg-amber-400/5'}">
-                                    ${imp.status}
-                                </span>
+                                <div class="flex flex-col items-end gap-1">
+                                    ${imp.status_list.map(s => `
+                                        <span class="status-badge ${getStatusClass(s)}">${s}</span>
+                                    `).join('')}
+                                </div>
                             </div>
                             <h3 class="text-xs font-bold text-stone-50 group-hover:text-white truncate leading-tight mb-1">${imp.nome}</h3>
                             <p class="text-[9px] font-mono text-stone-500 group-hover:text-stone-400 truncate">${imp.driver}</p>
@@ -302,10 +305,25 @@
                 syncDot.className = "w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.5)]";
                 setTimeout(connectWS, 2000);
             };
+        }
 
-            ws.onerror = () => {
-                ws.close();
-            };
+        function showMeta(imp) {
+            systemMeta.innerHTML = `
+                <div class="space-y-3 animate-in fade-in slide-in-from-right-2 duration-300">
+                    <div>
+                        <span class="text-[8px] font-mono uppercase text-stone-600 block mb-1">Port</span>
+                        <span class="text-[10px] font-mono text-stone-200">${imp.porta}</span>
+                    </div>
+                    <div>
+                        <span class="text-[8px] font-mono uppercase text-stone-600 block mb-1">Location</span>
+                        <span class="text-[10px] font-mono text-stone-200">${imp.local}</span>
+                    </div>
+                    <div>
+                        <span class="text-[8px] font-mono uppercase text-stone-600 block mb-1">Comment</span>
+                        <span class="text-[10px] font-mono text-stone-400 italic">${imp.comentario || 'No comments.'}</span>
+                    </div>
+                </div>
+            `;
         }
 
         function copyKey() {

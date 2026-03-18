@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Header, Re
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 import uvicorn
 from dotenv import load_dotenv
 
@@ -64,21 +64,50 @@ class ConnectionManager:
             try:
                 await connection.send_text(message)
             except Exception:
-                pass # Connection might be closed
+                pass 
 
 manager = ConnectionManager()
 
-def get_printer_status(status_code):
-    statuses = {
-        0: "Pronta",
-        win32print.PRINTER_STATUS_PAUSED: "Pausada",
-        win32print.PRINTER_STATUS_ERROR: "Erro",
-        win32print.PRINTER_STATUS_OFFLINE: "Offline",
-        win32print.PRINTER_STATUS_PAPER_OUT: "Sem Papel",
-        win32print.PRINTER_STATUS_PRINTING: "Imprimindo...",
-        win32print.PRINTER_STATUS_BUSY: "Ocupada",
-    }
-    return statuses.get(status_code, f"Status {status_code}")
+# Mapeamento expandido de status do Windows Spooler
+PRINTER_STATUS_FLAGS = {
+    win32print.PRINTER_STATUS_PAUSED: "Pausada",
+    win32print.PRINTER_STATUS_ERROR: "Erro Crítico",
+    win32print.PRINTER_STATUS_PENDING_DELETION: "Exclusão Pendente",
+    win32print.PRINTER_STATUS_PAPER_JAM: "Atolamento de Papel",
+    win32print.PRINTER_STATUS_PAPER_OUT: "Sem Papel",
+    win32print.PRINTER_STATUS_MANUAL_FEED: "Alimentação Manual",
+    win32print.PRINTER_STATUS_PAPER_PROBLEM: "Problema no Papel",
+    win32print.PRINTER_STATUS_OFFLINE: "Offline",
+    win32print.PRINTER_STATUS_IO_ACTIVE: "I/O Ativo",
+    win32print.PRINTER_STATUS_BUSY: "Ocupada",
+    win32print.PRINTER_STATUS_PRINTING: "Imprimindo...",
+    win32print.PRINTER_STATUS_OUTPUT_BIN_FULL: "Bandeja de Saída Cheia",
+    win32print.PRINTER_STATUS_NOT_AVAILABLE: "Não Disponível",
+    win32print.PRINTER_STATUS_WAITING: "Aguardando...",
+    win32print.PRINTER_STATUS_PROCESSING: "Processando...",
+    win32print.PRINTER_STATUS_INITIALIZING: "Inicializando...",
+    win32print.PRINTER_STATUS_WARMING_UP: "Aquecendo...",
+    win32print.PRINTER_STATUS_TONER_LOW: "Toner Baixo",
+    win32print.PRINTER_STATUS_NO_TONER: "Sem Toner",
+    win32print.PRINTER_STATUS_PAGE_PUNT: "Erro de Página",
+    win32print.PRINTER_STATUS_USER_INTERVENTION: "Intervenção do Usuário",
+    win32print.PRINTER_STATUS_OUT_OF_MEMORY: "Sem Memória",
+    win32print.PRINTER_STATUS_DOOR_OPEN: "Tampa Aberta",
+    win32print.PRINTER_STATUS_SERVER_UNKNOWN: "Servidor Desconhecido",
+    win32print.PRINTER_STATUS_POWER_SAVE: "Economia de Energia",
+}
+
+def parse_printer_status(status_code: int) -> List[str]:
+    """Analisa o bitmask de status da impressora."""
+    if status_code == 0:
+        return ["Pronta"]
+    
+    found_statuses = []
+    for flag, label in PRINTER_STATUS_FLAGS.items():
+        if status_code & flag:
+            found_statuses.append(label)
+            
+    return found_statuses if found_statuses else [f"Status {status_code}"]
 
 def get_system_data():
     impressoras_data = []
@@ -88,11 +117,19 @@ def get_system_data():
             try:
                 hPrinter = win32print.OpenPrinter(imp[2])
                 info = win32print.GetPrinter(hPrinter, 2)
+                
+                # Coleta metadados avançados
+                status_list = parse_printer_status(info['Status'])
+                
                 impressoras_data.append({
                     "nome": str(imp[2]),
-                    "status": get_printer_status(info['Status']),
+                    "status_list": status_list,
+                    "status_principal": status_list[0],
                     "trabalhos_na_fila": info['cJobs'],
-                    "driver": str(info['pDriverName'])
+                    "driver": str(info['pDriverName']),
+                    "porta": str(info['pPortName']),
+                    "local": str(info['pLocation']) or "Local",
+                    "comentario": str(info['pComment'])
                 })
                 win32print.ClosePrinter(hPrinter)
             except Exception as e_inner:
@@ -110,7 +147,6 @@ def get_system_data():
     
     return {"impressoras": impressoras_data, "logs": logs}
 
-# Background Loop for real-time updates
 async def broadcast_updates():
     while True:
         try:
@@ -123,16 +159,13 @@ async def broadcast_updates():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start the broadcast task
     task = asyncio.create_task(broadcast_updates())
     yield
-    # Shutdown: Cancel the task
     task.cancel()
 
 app = FastAPI(title="Printer API - Gateway Edition", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
-# 3. Segurança (API Key)
 async def verify_api_key(x_api_key: str = Header(None)):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Acesso negado: Chave de API inválida.")
@@ -145,11 +178,12 @@ class Formatacao(BaseModel):
 
 class ImpressaoRequest(BaseModel):
     tipo: str # "comum", "zebra", "pdf"
-    conteudo: str # Texto, ZPL ou Base64 do PDF
+    conteudo: str 
     impressora: Optional[str] = None
     formatacao: Optional[Formatacao] = Formatacao()
+    forcar: bool = False # Se True, ignora avisos de hardware
 
-# Funções de Execução de Impressão
+# Motores de Impressão
 async def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
     try:
         hdc = win32ui.CreateDC()
@@ -165,7 +199,6 @@ async def executar_impressao_comum(nome_impressora, texto, formatacao: Formataca
             y += int(formatacao.tamanho * 1.5)
         hdc.EndPage(); hdc.EndDoc(); hdc.DeleteDC()
         logger.info(f"Sucesso: Impressao comum enviada para '{nome_impressora}'")
-        # Forçar atualização imediata após sucesso
         await manager.broadcast(json.dumps(get_system_data()))
     except Exception as e: 
         logger.error(f"Falha na impressao comum: {e}")
@@ -198,10 +231,9 @@ async def executar_impressao_pdf(nome_impressora, caminho_pdf):
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
-        # Send initial data immediately
         await websocket.send_text(json.dumps(get_system_data()))
         while True:
-            await websocket.receive_text() # Keep connection alive
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception:
@@ -226,6 +258,34 @@ async def listar_impressoras():
 @app.post("/imprimir", dependencies=[Depends(verify_api_key)])
 async def imprimir(pedido: ImpressaoRequest, background_tasks: BackgroundTasks):
     nome_impressora = pedido.impressora if pedido.impressora else IMPRESSORA_PADRAO
+    
+    # 1. Validação de Hardware Pré-Impressão
+    try:
+        hPrinter = win32print.OpenPrinter(nome_impressora)
+        info = win32print.GetPrinter(hPrinter, 2)
+        win32print.ClosePrinter(hPrinter)
+        
+        status_code = info['Status']
+        # Status Críticos que impedem impressão
+        status_criticos = (win32print.PRINTER_STATUS_OFFLINE | 
+                           win32print.PRINTER_STATUS_ERROR | 
+                           win32print.PRINTER_STATUS_PAPER_OUT |
+                           win32print.PRINTER_STATUS_PAPER_JAM |
+                           win32print.PRINTER_STATUS_DOOR_OPEN)
+        
+        if (status_code & status_criticos) and not pedido.forcar:
+            status_labels = ", ".join(parse_printer_status(status_code))
+            logger.warning(f"Impressão rejeitada para '{nome_impressora}': {status_labels}")
+            raise HTTPException(
+                status_code=503, 
+                detail=f"Impressora não está pronta para receber trabalhos. Status: {status_labels}. Use 'forcar': true para ignorar."
+            )
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        logger.error(f"Erro ao validar impressora '{nome_impressora}': {e}")
+        # Se não conseguir abrir a impressora, ela provavelmente não existe ou está inacessível
+        raise HTTPException(status_code=404, detail=f"Impressora '{nome_impressora}' não encontrada ou inacessível.")
+
     job_id = str(uuid.uuid4())[:8]
     
     if pedido.tipo == "zebra":
@@ -244,7 +304,6 @@ async def imprimir(pedido: ImpressaoRequest, background_tasks: BackgroundTasks):
     else:
         background_tasks.add_task(executar_impressao_comum, nome_impressora, pedido.conteudo, pedido.formatacao)
     
-    # Broadcast status immediately after adding task
     await manager.broadcast(json.dumps(get_system_data()))
     
     return {"job_id": job_id, "status": "Processando em segundo plano", "impressora": nome_impressora}
