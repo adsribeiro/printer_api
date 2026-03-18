@@ -17,13 +17,13 @@ Este documento estabelece as fases de melhoria para transformar o protótipo atu
 - [x] **Fila Assíncrona**: Uso de `BackgroundTasks` para resposta imediata da API.
 
 ## 📊 Fase 3: Monitoramento e Interface (Concluída ✅)
-- [x] **Painel Administrativo v4.3**: Interface "Responsive Fluid" com efeito visual (Mouse Glow) e alto contraste.
-- [x] **Dashboard em Tempo Real**: Polling de 3s para logs e status de hardware.
+- [x] **Painel Administrativo v5.0**: Interface Real-time via WebSockets com efeito visual (Mouse Glow).
+- [x] **Dashboard em Tempo Real**: Substituição de polling por **WebSockets (Push)**.
 - [x] **Segurança**: Autenticação via Header `X-Api-Key`.
 - [x] **Gestão de Layouts**: Sistema de snapshots e histórico em `templates/backups/`.
 
-## 🌐 Fase 4: Escalabilidade e Ecossistema (Futuro 🚀)
-- [ ] **WebSockets**: Substituir o polling por notificações push em tempo real.
+## 🌐 Fase 4: Escalabilidade e Ecossistema (Em Progresso 🚀)
+- [x] **WebSockets**: Notificações push instantâneas para logs e status.
 - [ ] **Monitoramento de Hardware Avançado**: Detectar falta de papel/tinta antes do envio.
 - [ ] **Dockerização (Windows Containers)**: Empacotamento para deploy isolado.
 - [ ] **SDK Client**: Exemplo oficial de implementação em Python/JS para desenvolvedores.
@@ -31,6 +31,6 @@ Este documento estabelece as fases de melhoria para transformar o protótipo atu
 ---
 
 ## 📈 Métricas Atuais
-1. **Latência**: Resposta do endpoint ~50ms (sem IO de spooler no thread principal).
+1. **Latência**: Resposta do dashboard instantânea via WS (Latência de rede apenas).
 2. **Confiabilidade**: Logs em UTF-8 garantem rastreabilidade total no Windows.
 3. **Versatilidade**: Suporte unificado para Zebra (ZPL), PDF e GDI (Comum).

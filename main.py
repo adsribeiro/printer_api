@@ -5,12 +5,15 @@ import sys
 import time
 import base64
 import tempfile
+import asyncio
+import json
+from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 import win32print
 import win32ui
 import win32con
 import win32api
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Header, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Header, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -43,25 +46,27 @@ IMPRESSORA_PADRAO = os.getenv("IMPRESSORA_PADRAO", "Microsoft Print to PDF")
 PORTA_API = int(os.getenv("PORTA_API", 5000))
 API_KEY = os.getenv("API_KEY", "minha_chave_segura_123")
 
-app = FastAPI(title="Printer API - Gateway Edition")
-templates = Jinja2Templates(directory="templates")
+# 2. WebSocket Connection Manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
 
-# 2. Segurança (API Key)
-async def verify_api_key(x_api_key: str = Header(None)):
-    if x_api_key != API_KEY:
-        raise HTTPException(status_code=403, detail="Acesso negado: Chave de API inválida.")
-    return x_api_key
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
 
-class Formatacao(BaseModel):
-    negrito: bool = False
-    tamanho: int = 40
-    alinhamento: str = "left"
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
-class ImpressaoRequest(BaseModel):
-    tipo: str # "comum", "zebra", "pdf"
-    conteudo: str # Texto, ZPL ou Base64 do PDF
-    impressora: Optional[str] = None
-    formatacao: Optional[Formatacao] = Formatacao()
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass # Connection might be closed
+
+manager = ConnectionManager()
 
 def get_printer_status(status_code):
     statuses = {
@@ -105,8 +110,47 @@ def get_system_data():
     
     return {"impressoras": impressoras_data, "logs": logs}
 
+# Background Loop for real-time updates
+async def broadcast_updates():
+    while True:
+        try:
+            if manager.active_connections:
+                data = get_system_data()
+                await manager.broadcast(json.dumps(data))
+        except Exception as e:
+            logger.error(f"Erro no loop de broadcast: {e}")
+        await asyncio.sleep(1)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start the broadcast task
+    task = asyncio.create_task(broadcast_updates())
+    yield
+    # Shutdown: Cancel the task
+    task.cancel()
+
+app = FastAPI(title="Printer API - Gateway Edition", lifespan=lifespan)
+templates = Jinja2Templates(directory="templates")
+
+# 3. Segurança (API Key)
+async def verify_api_key(x_api_key: str = Header(None)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Acesso negado: Chave de API inválida.")
+    return x_api_key
+
+class Formatacao(BaseModel):
+    negrito: bool = False
+    tamanho: int = 40
+    alinhamento: str = "left"
+
+class ImpressaoRequest(BaseModel):
+    tipo: str # "comum", "zebra", "pdf"
+    conteudo: str # Texto, ZPL ou Base64 do PDF
+    impressora: Optional[str] = None
+    formatacao: Optional[Formatacao] = Formatacao()
+
 # Funções de Execução de Impressão
-def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
+async def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
     try:
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(nome_impressora)
@@ -121,10 +165,12 @@ def executar_impressao_comum(nome_impressora, texto, formatacao: Formatacao):
             y += int(formatacao.tamanho * 1.5)
         hdc.EndPage(); hdc.EndDoc(); hdc.DeleteDC()
         logger.info(f"Sucesso: Impressao comum enviada para '{nome_impressora}'")
+        # Forçar atualização imediata após sucesso
+        await manager.broadcast(json.dumps(get_system_data()))
     except Exception as e: 
         logger.error(f"Falha na impressao comum: {e}")
 
-def executar_impressao_zebra(nome_impressora, zpl_code):
+async def executar_impressao_zebra(nome_impressora, zpl_code):
     try:
         hPrinter = win32print.OpenPrinter(nome_impressora)
         win32print.StartDocPrinter(hPrinter, 1, ("Etiqueta_ZPL", None, "RAW"))
@@ -132,29 +178,39 @@ def executar_impressao_zebra(nome_impressora, zpl_code):
         win32print.WritePrinter(hPrinter, zpl_code.encode("utf-8"))
         win32print.EndPagePrinter(hPrinter); win32print.EndDocPrinter(hPrinter); win32print.ClosePrinter(hPrinter)
         logger.info(f"Sucesso: ZPL enviado para '{nome_impressora}'")
+        await manager.broadcast(json.dumps(get_system_data()))
     except Exception as e: 
         logger.error(f"Falha na impressao Zebra: {e}")
 
-def executar_impressao_pdf(nome_impressora, caminho_pdf):
+async def executar_impressao_pdf(nome_impressora, caminho_pdf):
     try:
-        # "printto" é o comando padrão para imprimir em uma impressora específica no Windows
         win32api.ShellExecute(0, "printto", caminho_pdf, f'"{nome_impressora}"', ".", 0)
         logger.info(f"Sucesso: PDF enviado para o spooler da '{nome_impressora}'")
-        # Aguarda um tempo seguro para o spooler carregar o arquivo antes de deletar
-        time.sleep(10)
+        await manager.broadcast(json.dumps(get_system_data()))
+        await asyncio.sleep(10)
         if os.path.exists(caminho_pdf):
             os.remove(caminho_pdf)
-            logger.info(f"Arquivo temporário removido: {caminho_pdf}")
+            logger.info(f"Arquivo temporario removido: {caminho_pdf}")
     except Exception as e:
         logger.error(f"Falha na impressao PDF: {e}")
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        # Send initial data immediately
+        await websocket.send_text(json.dumps(get_system_data()))
+        while True:
+            await websocket.receive_text() # Keep connection alive
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
+
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request):
-    data = get_system_data()
     return templates.TemplateResponse("admin.html", {
         "request": request, 
-        "impressoras": data["impressoras"],
-        "logs": data["logs"],
         "api_key_exemplo": API_KEY
     })
 
@@ -176,7 +232,6 @@ async def imprimir(pedido: ImpressaoRequest, background_tasks: BackgroundTasks):
         background_tasks.add_task(executar_impressao_zebra, nome_impressora, pedido.conteudo)
     elif pedido.tipo == "pdf":
         try:
-            # Decodifica Base64 e salva em arquivo temporário
             pdf_bytes = base64.b64decode(pedido.conteudo)
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(pdf_bytes)
@@ -185,9 +240,12 @@ async def imprimir(pedido: ImpressaoRequest, background_tasks: BackgroundTasks):
             logger.info(f"Processando PDF em Background. Temp: {caminho_temp}")
         except Exception as e:
             logger.error(f"Erro ao processar Base64 de PDF: {e}")
-            raise HTTPException(status_code=400, detail="Conteúdo do PDF inválido (Base64 esperado).")
+            raise HTTPException(status_code=400, detail="Conteudo do PDF invalido (Base64 esperado).")
     else:
         background_tasks.add_task(executar_impressao_comum, nome_impressora, pedido.conteudo, pedido.formatacao)
+    
+    # Broadcast status immediately after adding task
+    await manager.broadcast(json.dumps(get_system_data()))
     
     return {"job_id": job_id, "status": "Processando em segundo plano", "impressora": nome_impressora}
 
