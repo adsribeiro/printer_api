@@ -1,14 +1,17 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+*.log
+.venv/
 
-# Virtual environments
-.venv
-.github
+# Environment
+.env
 
+# Backups e Histórico Local
+templates/backups/
+test_quick.py
+
+# GitHub e Ferramentas CLI
+.github/
 .gemini/
 gha-creds-*.json
