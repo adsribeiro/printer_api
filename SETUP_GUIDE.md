@@ -142,6 +142,16 @@ const client = new PrinterGateway('http://localhost:5000', 'sua_chave');
 await client.printText('Texto para imprimir', { bold: true, size: 40 });
 ```
 
+### TypeScript (Web / Node.js com Tipagem)
+Utilize os arquivos em `sdk/typescript/`.
+
+```typescript
+import { PrinterGateway } from './PrinterClient';
+
+const client = new PrinterGateway('http://localhost:5000', 'sua_chave');
+const res = await client.printText('Texto Tipado', { bold: true });
+```
+
 ### Vantagens do SDK:
 *   **Tratamento Automático**: Conversão de arquivos PDF locais para Base64.
 *   **Abstração de Headers**: Gerenciamento transparente da `X-Api-Key`.
