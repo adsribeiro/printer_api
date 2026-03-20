@@ -26,7 +26,7 @@ Este documento estabelece as fases de melhoria para transformar o protótipo atu
 - [x] **WebSockets**: Notificações push instantâneas para logs e status.
 - [x] **Monitoramento de Hardware Avançado**: Bitmask de status e validação pré-impressão.
 - [x] **Dockerização (Windows Containers)**: Empacotamento para deploy isolado.
-- [ ] **SDK Client**: Exemplo oficial de implementação em Python/JS para desenvolvedores.
+- [x] **SDK Client**: Exemplo oficial de implementação em Python/JS para desenvolvedores.
 
 ---
 

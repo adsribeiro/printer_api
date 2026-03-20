@@ -118,3 +118,33 @@ docker run -p 5000:5000 --env-file .env --isolation=process printer-api-gateway
 1.  **Isolamento**: Para que o container acesse as impressoras físicas instaladas no Host, você **deve** utilizar `--isolation=process`. Caso contrário, o container terá um spooler isolado e verá apenas impressoras de rede mapeadas via IP.
 2.  **Base Image**: A imagem utiliza `windowsservercore` (LTSC 2022), que é uma imagem grande (~5GB) necessária para suportar as APIs gráficas (GDI) do Windows.
 
+---
+
+## 📦 8. SDKs & Integração
+
+Para facilitar a vida dos desenvolvedores, disponibilizamos exemplos oficiais de integração na pasta `sdk/`.
+
+### Python (Recomendado para Backends)
+Utilize a classe `PrinterGateway` em `sdk/python/printer_client.py`.
+
+```python
+from printer_client import PrinterGateway
+
+client = PrinterGateway(base_url="http://localhost:5000", api_key="sua_chave")
+client.print_text("Texto para imprimir", bold=True, size=40)
+```
+
+### JavaScript (Browsers / Node.js 18+)
+Utilize a classe em `sdk/javascript/PrinterClient.js`.
+
+```javascript
+const client = new PrinterGateway('http://localhost:5000', 'sua_chave');
+await client.printText('Texto para imprimir', { bold: true, size: 40 });
+```
+
+### Vantagens do SDK:
+*   **Tratamento Automático**: Conversão de arquivos PDF locais para Base64.
+*   **Abstração de Headers**: Gerenciamento transparente da `X-Api-Key`.
+*   **Segurança de Tipos**: Parâmetros nomeados para formatação e seleção de impressora.
+
+
