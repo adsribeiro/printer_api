@@ -1,117 +1,41 @@
 import requests
-import json
 import os
-import time
 import base64
 from dotenv import load_dotenv
 
-# Carrega as configurações do .env
 load_dotenv()
 
 API_URL = f"http://localhost:{os.getenv('PORTA_API', 5000)}"
 API_KEY = os.getenv("API_KEY", "minha_chave_segura_123")
-HEADERS = {
-    "X-Api-Key": API_KEY,
-    "Content-Type": "application/json"
-}
+HEADERS = {"X-Api-Key": API_KEY, "Content-Type": "application/json"}
 
-def limpar_tela():
-    os.system('cls' if os.name == 'nt' else 'clear')
+def enviar_impressao(num_pedido, impressora, conteudo):
+    # Se o conteúdo for um caminho de arquivo PDF, converte para Base64
+    if conteudo.lower().endswith(".pdf") and os.path.exists(conteudo):
+        with open(conteudo, "rb") as f:
+            conteudo = base64.b64encode(f.read()).decode("utf-8")
 
-def imprimir_banner():
-    print("="*50)
-    print("      PRINTER API GATEWAY - CLIENTE DE TESTE   ")
-    print("="*50)
-    print(f"Endpoint: {API_URL}")
-    print("="*50 + "\n")
-
-def testar_conexao():
-    try:
-        response = requests.get(f"{API_URL}/impressoras", headers=HEADERS)
-        if response.status_code == 200:
-            print(f"✅ Conexão OK! Impressoras encontradas: {len(response.json()['impressoras'])}")
-            return True
-        else:
-            print(f"❌ Erro de Autenticação: {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"❌ Erro ao conectar na API: {e}")
-        return False
-
-def enviar_impressao(tipo, conteudo, formatacao=None):
     payload = {
-        "tipo": tipo,
+        "num_pedido": num_pedido,
+        "impressora": impressora,
         "conteudo": conteudo
     }
-    if formatacao:
-        payload["formatacao"] = formatacao
 
-    print(f"\n⏳ Enviando job tipo '{tipo}'...")
+    print(f"\n⏳ Enviando Pedido {num_pedido} para {impressora}...")
     try:
-        response = requests.post(f"{API_URL}/imprimir", headers=HEADERS, json=payload)
-        if response.status_code == 200:
-            res = response.json()
-            print(f"🚀 Sucesso! Job ID: {res['job_id']}")
-            print(f"📍 Destino: {res['impressora']}")
-            print(f"📡 Status: {res['status']}")
+        r = requests.post(f"{API_URL}/imprimir", headers=HEADERS, json=payload)
+        if r.status_code == 200:
+            print(f"🚀 Sucesso! Detalhes: {r.json()}")
         else:
-            print(f"💥 Erro na API: {response.text}")
+            print(f"💥 Erro {r.status_code}: {r.text}")
     except Exception as e:
-        print(f"💥 Erro na requisição: {e}")
-
-def menu():
-    while True:
-        limpar_tela()
-        imprimir_banner()
-        
-        print("Escolha uma opção de teste:")
-        print("1. [Texto] Impressão Comum (Simples)")
-        print("2. [Texto] Impressão Comum (Negrito + Grande)")
-        print("3. [Zebra] Etiqueta ZPL (ZPL RAW)")
-        print("4. [PDF]   Imprimir Arquivo PDF (Converter para Base64)")
-        print("5. [List]  Listar Impressoras Disponíveis")
-        print("0. Sair")
-        
-        opcao = input("\nDigite o número: ")
-
-        if opcao == "1":
-            texto = input("Digite o texto para imprimir: ")
-            enviar_impressao("comum", texto)
-        
-        elif opcao == "2":
-            texto = input("Digite o texto para imprimir em DESTAQUE: ")
-            fmt = {"negrito": True, "tamanho": 60}
-            enviar_impressao("comum", texto, formatacao=fmt)
-        
-        elif opcao == "3":
-            zpl = "^XA^FO50,50^A0N,50,50^FDETIQUETA DE TESTE GATEWAY^FS^XZ"
-            print(f"Enviando ZPL Padrão: {zpl}")
-            enviar_impressao("zebra", zpl)
-        
-        elif opcao == "4":
-            caminho = input("Digite o caminho completo do PDF (Ex: C:\\temp\\teste.pdf): ")
-            if os.path.exists(caminho):
-                with open(caminho, "rb") as pdf_file:
-                    base64_pdf = base64.b64encode(pdf_file.read()).decode('utf-8')
-                enviar_impressao("pdf", base64_pdf)
-            else:
-                print(f"❌ Arquivo não encontrado: {caminho}")
-        
-        elif opcao == "5":
-            testar_conexao()
-        
-        elif opcao == "0":
-            print("\nEncerrando teste. Até logo!")
-            break
-        
-        else:
-            print("\nOpção inválida.")
-        
-        input("\nPressione ENTER para continuar...")
+        print(f"💥 Falha na conexão: {e}")
 
 if __name__ == "__main__":
-    if testar_conexao():
-        time.sleep(1)
-        menu()
-    else:
-        print("\nCertifique-se que a API está rodando antes de iniciar o script.")
+    print("--- TESTE SIMPLIFICADO PRINTER API ---")
+    pedido = input("Número do Pedido: ")
+    impressora = input("Nome da Impressora (ex: Microsoft Print to PDF): ")
+    print("\nDicas de conteúdo: '^XA...' para Zebra, 'C:\\doc.pdf' para PDF, ou qualquer texto.")
+    conteudo = input("Conteúdo ou Caminho PDF: ")
+    
+    enviar_impressao(pedido, impressora, conteudo)

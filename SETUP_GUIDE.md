@@ -1,160 +1,54 @@
 # Setup & Architecture Guide: Printer API Gateway
 
-Este guia técnico detalha a infraestrutura, configuração e operação da **Printer API Gateway**, uma solução robusta em Python para gerenciamento de impressões (ZPL, PDF e GDI) em ambientes Windows.
+Este guia técnico detalha a infraestrutura e operação da **Printer API Gateway**. A API foi simplificada para facilitar a integração, exigindo apenas 3 parâmetros fundamentais.
 
 ---
 
-## 🛠️ 1. Stack Tecnológica
-*   **Engine**: Python 3.12+ (Otimizado via [uv](https://docs.astral.sh/uv/)).
-*   **Framework**: FastAPI (Async/Await) para alta performance.
-*   **Comunicação Real-time**: WebSockets para streaming de logs e status.
-*   **Interface**: Jinja2 + Tailwind CSS (Aura Design System v5.0).
-*   **Integração Windows**: `pywin32` (win32print, win32ui, win32api).
+## 🚀 1. Integração Simplificada
 
----
+A API agora utiliza **Auto-detecção de Conteúdo**, eliminando a necessidade de especificar o tipo de impressão ou formatação complexa no payload inicial.
 
-## ⚙️ 2. Instalação e Preparação
-
-### Inicialização
-```bash
-uv init printer-api
-cd printer-api
-```
-
-### Dependências Críticas
-```bash
-uv add "fastapi[standard]" pywin32 python-dotenv requests
-```
-
----
-
-## 🛰️ 3. Arquitetura do Sistema (`main.py`)
-
-O Gateway opera em três camadas principais:
-
-### A. Camada de Segurança
-Implementa autenticação via Header `X-Api-Key`, validada em todos os endpoints de escrita.
-
-### B. Camada de Processamento (Print Engines)
-1.  **GDI Engine (`comum`)**: Renderiza texto diretamente no Canvas do Windows, suportando formatação (negrito/tamanho).
-2.  **ZPL RAW Engine (`zebra`)**: Envia comandos de baixo nível para impressoras térmicas Zebra.
-3.  **PDF Engine (`pdf`)**: Decodifica Base64, gera buffer temporário e utiliza `ShellExecute` para impressão silenciosa.
-
-### C. Camada Real-time (WebSockets)
-Utiliza um `ConnectionManager` para gerenciar conexões persistentes com o Dashboard Administrativo, realizando broadcast de eventos instantaneamente.
-
----
-
-## 🖥️ 4. Console Administrativo
-O painel pode ser acessado em `http://localhost:5000/admin`.
-*   **Monitor de Hardware**: Status em tempo real das impressoras locais e de rede.
-*   **Live Stream**: Terminal de logs via WebSocket (v5.0).
-*   **Efeito Visual**: Interface Dark Mode com "Mouse Glow Effect".
-
----
-
-## 🔌 5. Guia de Integração (API Reference)
-
-### Endpoint Principal: `POST /imprimir`
-**Headers:**
+### Endpoint: `POST /imprimir`
+**Payload Necessário:**
 ```json
 {
-  "X-Api-Key": "sua_chave_definida_no_env",
-  "Content-Type": "application/json"
+  "num_pedido": "12345",
+  "impressora": "Nome da Impressora no Windows",
+  "conteudo": "Conteúdo para imprimir"
 }
 ```
 
-### Exemplos de Payload:
-
-**1. Impressão Comum (Texto):**
-```json
-{
-  "tipo": "comum",
-  "conteudo": "Linha 1\nLinha 2",
-  "formatacao": { "negrito": true, "tamanho": 40 }
-}
-```
-
-**2. Etiqueta Zebra (ZPL):**
-```json
-{
-  "tipo": "zebra",
-  "conteudo": "^XA^FO50,50^A0N,50,50^FDPRODUTO TESTE^FS^XZ"
-}
-```
-
-**3. Documento PDF (Base64):**
-```json
-{
-  "tipo": "pdf",
-  "conteudo": "JVBERi0xLjQKJ..." // String Base64 do arquivo
-}
-```
+### 💡 Como a Detecção Funciona:
+1.  **PDF**: Se o `conteudo` começar com `JVBERi` (Base64 de um PDF), a API processa como documento.
+2.  **Zebra (ZPL)**: Se o `conteudo` começar com `^XA`, a API processa como etiqueta térmica.
+3.  **Texto**: Qualquer outro conteúdo será impresso como texto simples (GDI) usando fonte padrão Arial 40.
 
 ---
 
-## 📝 6. Notas de Operação
-*   **Encoding**: Todo o sistema é **UTF-8 Hardened**. Logs e mensagens suportam acentuação brasileira completa.
-*   **Fila Assíncrona**: A API utiliza `BackgroundTasks`. O retorno `200 OK` significa que o trabalho foi aceito e está sendo processado pelo spooler do Windows.
-*   **Manutenção de Layout**: Versões anteriores do dashboard são preservadas em `templates/backups/`.
+## 📦 2. Usando os SDKs (Recomendado)
 
----
+Os SDKs foram atualizados para suportar a nova interface simplificada.
 
-## 🐳 7. Dockerização (Windows Containers)
-
-O Gateway pode ser executado em um container para isolamento, mas **exige o uso de Windows Containers** (devido à dependência do `pywin32` e Spooler do Windows).
-
-### Build da Imagem
-```powershell
-docker build -t printer-api-gateway .
-```
-
-### Execução do Container
-```powershell
-docker run -p 5000:5000 --env-file .env --isolation=process printer-api-gateway
-```
-
-### ⚠️ Notas Críticas sobre Docker:
-1.  **Isolamento**: Para que o container acesse as impressoras físicas instaladas no Host, você **deve** utilizar `--isolation=process`. Caso contrário, o container terá um spooler isolado e verá apenas impressoras de rede mapeadas via IP.
-2.  **Base Image**: A imagem utiliza `windowsservercore` (LTSC 2022), que é uma imagem grande (~5GB) necessária para suportar as APIs gráficas (GDI) do Windows.
-
----
-
-## 📦 8. SDKs & Integração
-
-Para facilitar a vida dos desenvolvedores, disponibilizamos exemplos oficiais de integração na pasta `sdk/`.
-
-### Python (Recomendado para Backends)
-Utilize a classe `PrinterGateway` em `sdk/python/printer_client.py`.
-
+### Python
 ```python
 from printer_client import PrinterGateway
 
-client = PrinterGateway(base_url="http://localhost:5000", api_key="sua_chave")
-client.print_text("Texto para imprimir", bold=True, size=40)
+client = PrinterGateway(api_key="sua_chave")
+# O SDK converte arquivos .pdf automaticamente para Base64 se você passar o caminho
+client.imprimir(num_pedido="100", impressora="Zebra", conteudo="^XA...^XZ")
 ```
 
-### JavaScript (Browsers / Node.js 18+)
-Utilize a classe em `sdk/javascript/PrinterClient.js`.
-
-```javascript
-const client = new PrinterGateway('http://localhost:5000', 'sua_chave');
-await client.printText('Texto para imprimir', { bold: true, size: 40 });
-```
-
-### TypeScript (Web / Node.js com Tipagem)
-Utilize os arquivos em `sdk/typescript/`.
-
+### TypeScript / JavaScript
 ```typescript
 import { PrinterGateway } from './PrinterClient';
 
 const client = new PrinterGateway('http://localhost:5000', 'sua_chave');
-const res = await client.printText('Texto Tipado', { bold: true });
+await client.imprimir("101", "Impressora PDF", "Texto simples ou Base64");
 ```
 
-### Vantagens do SDK:
-*   **Tratamento Automático**: Conversão de arquivos PDF locais para Base64.
-*   **Abstração de Headers**: Gerenciamento transparente da `X-Api-Key`.
-*   **Segurança de Tipos**: Parâmetros nomeados para formatação e seleção de impressora.
+---
 
-
+## 📝 3. Notas de Operação
+*   **Segurança**: Header `X-Api-Key` é obrigatório.
+*   **Rastreabilidade**: O `num_pedido` é utilizado como nome do trabalho no spooler do Windows, facilitando a identificação na fila física.
+*   **WebSockets**: O Dashboard (`/admin`) continua recebendo atualizações em tempo real via WebSockets.
