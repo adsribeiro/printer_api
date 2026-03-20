@@ -2,3 +2,8 @@
 2026-03-18 17:01:08,915 - PrinterAPI - INFO - Sucesso: Impressao comum enviada para 'Microsoft Print to PDF'
 2026-03-18 17:06:08,324 - PrinterAPI - INFO - Sucesso: Impressao comum enviada para 'Microsoft Print to PDF'
 2026-03-20 10:53:29,714 - PrinterAPI - INFO - Sucesso: Impressao comum enviada para 'Microsoft Print to PDF'
+2026-03-20 11:42:01,837 - PrinterAPI - INFO - Recebido Pedido 2025: Tipo detectado: comum para "Microsoft Print to PDF"
+2026-03-20 11:42:01,844 - PrinterAPI - ERROR - Pedido 2025: Falha na impressao comum: Unable to open printer
+2026-03-20 11:47:11,882 - PrinterAPI - ERROR - Pedido 2024: Impressora '"Microsoft Print to PDF"' nao encontrada no sistema.
+2026-03-20 11:47:43,726 - PrinterAPI - INFO - Pedido 2029: Impressao concluida com sucesso.
+2026-03-20 11:51:08,865 - PrinterAPI - INFO - Pedido REQ-ASP-001: Impressao concluida.
